@@ -296,6 +296,15 @@ async function commitCurrentNote() {
   if (!state.current) return;
   prepareCurrentNoteForSave();
 
+  const localSaved = await persistSaveThroughLocalServer();
+  if (localSaved) {
+    localStorage.removeItem(storageKeys.draft(state.current.path));
+    state.current.isNew = false;
+    elements.saveStatus.textContent = "저장됨";
+    toast("로컬 파일에 저장했어요. 이제 git add/commit/push 하면 공개 사이트에 반영돼요.");
+    return;
+  }
+
   const settings = getSettings();
   if (!settings.owner || !settings.repo || !settings.branch || !settings.token) {
     saveLocalDraft();
@@ -372,6 +381,35 @@ async function deleteCurrentNote() {
   }
 }
 
+
+async function persistSaveThroughLocalServer() {
+  try {
+    const response = await fetch("./api/save-note", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        path: state.current.path,
+        markdown: state.markdown,
+        manifest: state.manifest,
+      }),
+    });
+    if (response.status === 404 || response.status === 405) {
+      return false;
+    }
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "로컬 서버에 저장하지 못했어요.");
+    }
+    return true;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    throw error;
+  }
+}
 async function persistLocalDelete(path) {
   const apiDeleted = await persistDeleteThroughLocalServer(path);
   if (apiDeleted) {
@@ -801,15 +839,62 @@ function toggleLinkPanel() {
   }
 }
 
-function insertSelectedImage() {
+async function insertSelectedImage() {
   const file = elements.imageInput.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    insertAtCursor(`![${file.name}](${reader.result})`);
+
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    const uploadedPath = await uploadImageThroughLocalServer(file, dataUrl);
+    if (uploadedPath) {
+      insertAtCursor(`![${file.name}](../${uploadedPath})`);
+      toast("이미지를 로컬 images 폴더에 저장했어요.");
+      return;
+    }
+
+    insertAtCursor(`![${file.name}](${dataUrl})`);
+    toast("로컬 서버가 아니라서 브라우저 글 안에만 이미지를 넣었어요.");
+  } finally {
     elements.imageInput.value = "";
+  }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.addEventListener("error", () => reject(reader.error));
+    reader.readAsDataURL(file);
   });
-  reader.readAsDataURL(file);
+}
+
+async function uploadImageThroughLocalServer(file, dataUrl) {
+  try {
+    const response = await fetch("./api/upload-image", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        dataUrl,
+      }),
+    });
+    if (response.status === 404 || response.status === 405) {
+      return null;
+    }
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "이미지를 저장하지 못했어요.");
+    }
+    const result = await response.json();
+    return result.path;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 function insertAtCursor(snippet) {

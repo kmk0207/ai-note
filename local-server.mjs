@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +25,16 @@ createServer(async (request, response) => {
 
     if (request.method === "POST" && url.pathname === "/api/delete-note") {
       await deleteNote(request, response);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/save-note") {
+      await saveNote(request, response);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/upload-image") {
+      await uploadImage(request, response);
       return;
     }
 
@@ -74,7 +84,39 @@ async function deleteNote(request, response) {
   response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify({ ok: true }));
 }
+async function saveNote(request, response) {
+  const body = await readJson(request);
+  const notePath = normalizeNotePath(body.path);
+  const manifest = validateManifest(body.manifest);
+  const markdown = typeof body.markdown === "string" ? body.markdown : "";
 
+  await writeFile(safePath(notePath), markdown, "utf8");
+  await writeFile(
+    safePath("notes/manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
+
+  response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify({ ok: true }));
+}
+
+async function uploadImage(request, response) {
+  const body = await readJson(request, 20_000_000);
+  const filename = normalizeImageFilename(body.filename);
+  const dataUrl = typeof body.dataUrl === "string" ? body.dataUrl : "";
+  const match = dataUrl.match(/^data:image\/(?:png|jpe?g|gif|webp|svg\+xml);base64,([A-Za-z0-9+/=]+)$/i);
+
+  if (!match) {
+    throw new Error("Invalid image data");
+  }
+
+  await mkdir(safePath("images"), { recursive: true });
+  await writeFile(safePath(`images/${filename}`), Buffer.from(match[1], "base64"));
+
+  response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify({ ok: true, path: `images/${filename}` }));
+}
 function safePath(relativePath) {
   const resolved = path.resolve(root, relativePath);
   if (!resolved.startsWith(root + path.sep) && resolved !== root) {
@@ -83,6 +125,24 @@ function safePath(relativePath) {
   return resolved;
 }
 
+
+function normalizeImageFilename(filename) {
+  if (typeof filename !== "string") {
+    throw new Error("Missing image filename");
+  }
+  const extension = path.extname(filename).toLowerCase();
+  if (![".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(extension)) {
+    throw new Error("Unsupported image file type");
+  }
+  const basename = path
+    .basename(filename, extension)
+    .normalize("NFKD")
+    .replace(/[^\w가-힣-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+  const safeBase = basename || "image";
+  return `${Date.now()}-${safeBase}${extension}`;
+}
 function normalizeNotePath(notePath) {
   if (typeof notePath !== "string") {
     throw new Error("Missing note path");
@@ -115,13 +175,13 @@ function validateManifest(manifest) {
   return manifest;
 }
 
-function readJson(request) {
+function readJson(request, limit = 1_000_000) {
   return new Promise((resolve, reject) => {
     let body = "";
     request.setEncoding("utf8");
     request.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > limit) {
         reject(new Error("Request too large"));
         request.destroy();
       }
