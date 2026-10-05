@@ -6,31 +6,17 @@
       {
         "title": "Attention Is All You Need",
         "path": "notes/attention-is-all-you-need.md"
-      },
-      {
-        "title": "Long Short-Term Memory",
-        "path": "notes/long-short-term-memory.md"
       }
     ]
   },
   {
     "id": "ai-basic",
     "title": "AI Basic",
-    "notes": [
-      {
-        "title": "Optimization Notes",
-        "path": "notes/optimization-notes.md"
-      }
-    ]
+    "notes": []
   },
   {
     "id": "mlb-data-study",
     "title": "MLB Data Study",
-    "notes": [
-      {
-        "title": "Study Questions",
-        "path": "notes/study-questions.md"
-      }
-    ]
+    "notes": []
   }
 ]
