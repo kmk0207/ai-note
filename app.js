@@ -3,6 +3,7 @@ const state = {
   current: null,
   markdown: "",
   mode: "preview",
+  composeMode: "write",
 };
 
 const elements = {
@@ -14,6 +15,14 @@ const elements = {
   editorPanel: document.querySelector("#editorPanel"),
   markdownInput: document.querySelector("#markdownInput"),
   noteTitleInput: document.querySelector("#noteTitleInput"),
+  subjectInput: document.querySelector("#subjectInput"),
+  tagInput: document.querySelector("#tagInput"),
+  composeModeLabel: document.querySelector("#composeModeLabel"),
+  saveStatus: document.querySelector("#saveStatus"),
+  cancelEditButton: document.querySelector("#cancelEditButton"),
+  writeTabButton: document.querySelector("#writeTabButton"),
+  previewTabButton: document.querySelector("#previewTabButton"),
+  composePreview: document.querySelector("#composePreview"),
   viewButton: document.querySelector("#viewButton"),
   editButton: document.querySelector("#editButton"),
   saveLocalButton: document.querySelector("#saveLocalButton"),
@@ -63,10 +72,15 @@ function bindEvents() {
     commitCurrentNote().catch((error) => toast(error.message));
   });
   elements.newNoteButton.addEventListener("click", createNewNote);
+  elements.cancelEditButton.addEventListener("click", () => setMode("preview"));
+  elements.writeTabButton.addEventListener("click", () => setComposeMode("write"));
+  elements.previewTabButton.addEventListener("click", () => setComposeMode("preview"));
   elements.settingsButton.addEventListener("click", () => elements.settingsDialog.showModal());
   elements.saveSettingsButton.addEventListener("click", saveSettings);
   elements.markdownInput.addEventListener("input", updateMarkdownFromEditor);
   elements.noteTitleInput.addEventListener("input", updateTitleFromEditor);
+  elements.subjectInput.addEventListener("change", updateSubjectFromEditor);
+  elements.tagInput.addEventListener("input", updateTagFromEditor);
 }
 
 function setSidebar(value) {
@@ -82,12 +96,33 @@ function setMode(mode) {
   elements.editButton.classList.toggle("active", !isPreview);
   if (isPreview) {
     renderPreview();
+  } else {
+    elements.composeModeLabel.textContent = state.current?.isNew ? "NEW NOTE" : "EDIT NOTE";
+    setComposeMode("write");
+  }
+}
+
+function setComposeMode(mode) {
+  state.composeMode = mode;
+  const isWrite = mode === "write";
+  elements.markdownInput.classList.toggle("hidden", !isWrite);
+  elements.composePreview.classList.toggle("hidden", isWrite);
+  elements.writeTabButton.classList.toggle("active", isWrite);
+  elements.previewTabButton.classList.toggle("active", !isWrite);
+  if (!isWrite) {
+    elements.composePreview.innerHTML = markdownToHtml(state.markdown);
   }
 }
 
 function renderNav() {
   elements.noteNav.innerHTML = "";
+  elements.subjectInput.innerHTML = "";
   for (const section of state.manifest) {
+    const option = document.createElement("option");
+    option.value = section.id;
+    option.textContent = section.title;
+    elements.subjectInput.append(option);
+
     const wrapper = document.createElement("section");
     wrapper.className = "note-section";
 
@@ -135,6 +170,10 @@ async function openNote(path) {
   elements.currentSection.textContent = note.sectionTitle;
   elements.currentTitle.textContent = note.title;
   elements.noteTitleInput.value = note.title;
+  elements.subjectInput.value = note.section;
+  elements.tagInput.value = note.tags || "";
+  elements.composeModeLabel.textContent = "EDIT NOTE";
+  elements.saveStatus.textContent = localStorage.getItem(storageKeys.draft(path)) ? "임시저장됨" : "저장 전";
   elements.markdownInput.value = state.markdown;
   document.querySelectorAll(".note-link").forEach((button) => {
     button.classList.toggle("active", button.dataset.path === path);
@@ -157,6 +196,7 @@ function findNote(path) {
 
 function updateMarkdownFromEditor() {
   state.markdown = elements.markdownInput.value;
+  elements.saveStatus.textContent = "저장 전";
 }
 
 function updateTitleFromEditor() {
@@ -165,43 +205,58 @@ function updateTitleFromEditor() {
   elements.currentTitle.textContent = state.current.title;
   syncCurrentNoteIntoManifest();
   renderNav();
+  elements.subjectInput.value = state.current.section;
+  elements.saveStatus.textContent = "저장 전";
+}
+
+function updateSubjectFromEditor() {
+  if (!state.current) return;
+  const section = state.manifest.find((item) => item.id === elements.subjectInput.value);
+  if (!section) return;
+  moveCurrentNoteToSection(section);
+  elements.currentSection.textContent = section.title;
+  elements.saveStatus.textContent = "저장 전";
+}
+
+function updateTagFromEditor() {
+  if (!state.current) return;
+  state.current.tags = elements.tagInput.value.trim();
+  syncCurrentNoteIntoManifest();
+  elements.saveStatus.textContent = "저장 전";
 }
 
 function saveLocalDraft() {
   if (!state.current) return;
   localStorage.setItem(storageKeys.draft(state.current.path), state.markdown);
-  toast("Draft saved in this browser.");
+  elements.saveStatus.textContent = "임시저장됨";
+  toast("브라우저에 임시저장했어요.");
 }
 
 function createNewNote() {
-  const slug = prompt("New note slug, for example transformer-reading-log");
-  if (!slug) return;
-  const safeSlug = slug
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const title = safeSlug
-    .split("-")
-    .filter(Boolean)
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(" ");
+  const title = "";
   const note = {
-    title,
-    path: `notes/${safeSlug}.md`,
+    title: "새 노트",
+    path: `notes/draft-${Date.now()}.md`,
     section: "paper-review",
     sectionTitle: "Paper Review",
+    tags: "",
+    isNew: true,
   };
   state.current = note;
-  state.markdown = `# ${title}\n\n## 한 줄 요약\n\n\n## 배경\n\n\n## 핵심 아이디어\n\n\n## 헷갈리는 부분\n\n\n## 스터디 질문\n\n`;
+  state.markdown = `# 오늘 공부한 내용\n\n핵심 개념을 내 언어로 정리해 보세요.\n\n## 무엇을 배웠나요?\n\n\n## 왜 중요한가요?\n\n\n## 아직 모르는 건?\n\n`;
   syncCurrentNoteIntoManifest();
   renderNav();
   elements.currentSection.textContent = note.sectionTitle;
-  elements.currentTitle.textContent = note.title;
-  elements.noteTitleInput.value = note.title;
+  elements.currentTitle.textContent = "새 노트 작성";
+  elements.noteTitleInput.value = title;
+  elements.noteTitleInput.placeholder = "노트 제목";
+  elements.subjectInput.value = note.section;
+  elements.tagInput.value = "";
+  elements.composeModeLabel.textContent = "NEW NOTE";
+  elements.saveStatus.textContent = "저장 전";
   elements.markdownInput.value = state.markdown;
   setMode("edit");
-  toast("Write the note, then commit it to GitHub.");
+  toast("새 노트를 작성해보세요.");
 }
 
 async function commitCurrentNote() {
@@ -214,6 +269,7 @@ async function commitCurrentNote() {
     return;
   }
 
+  prepareCurrentNoteForSave();
   const path = state.current.path;
   const apiBase = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
   let sha;
@@ -248,7 +304,27 @@ async function commitCurrentNote() {
 
   await commitManifest(settings);
   localStorage.removeItem(storageKeys.draft(path));
-  toast("Committed to GitHub.");
+  state.current.isNew = false;
+  elements.saveStatus.textContent = "저장됨";
+  toast("GitHub에 저장했어요.");
+}
+
+function prepareCurrentNoteForSave() {
+  if (!state.current) return;
+  const title = elements.noteTitleInput.value.trim();
+  if (!title) {
+    throw new Error("노트 제목을 먼저 입력해 주세요.");
+  }
+  state.current.title = title;
+  elements.currentTitle.textContent = title;
+  const previousPath = state.current.path;
+  if (state.current.isNew || state.current.path.includes("/draft-")) {
+    state.current.path = `notes/${createSlug(title)}.md`;
+  }
+  if (previousPath !== state.current.path) {
+    removeNoteFromManifest(previousPath);
+  }
+  syncCurrentNoteIntoManifest();
 }
 
 async function commitManifest(settings) {
@@ -296,11 +372,48 @@ function syncCurrentNoteIntoManifest() {
 
   const existing = section.notes.find((note) => note.path === state.current.path);
   const note = { title: state.current.title, path: state.current.path };
+  if (state.current.tags) {
+    note.tags = state.current.tags;
+  }
   if (existing) {
     existing.title = note.title;
+    if (note.tags) {
+      existing.tags = note.tags;
+    } else {
+      delete existing.tags;
+    }
   } else {
     section.notes.push(note);
   }
+}
+
+function moveCurrentNoteToSection(section) {
+  const previousSection = state.manifest.find((item) => item.id === state.current.section);
+  if (previousSection) {
+    previousSection.notes = previousSection.notes.filter((note) => note.path !== state.current.path);
+  }
+  state.current.section = section.id;
+  state.current.sectionTitle = section.title;
+  syncCurrentNoteIntoManifest();
+  renderNav();
+  elements.subjectInput.value = section.id;
+}
+
+function removeNoteFromManifest(path) {
+  for (const section of state.manifest) {
+    section.notes = section.notes.filter((note) => note.path !== path);
+  }
+}
+
+function createSlug(value) {
+  const fallback = `note-${Date.now()}`;
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9가-힣]+/g, "-")
+      .replace(/^-+|-+$/g, "") || fallback
+  );
 }
 
 function githubHeaders(token) {

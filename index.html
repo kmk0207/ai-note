@@ -42,14 +42,63 @@
         <section class="workspace">
           <article class="preview-panel" id="previewPanel"></article>
           <section class="editor-panel hidden" id="editorPanel" aria-label="Markdown editor">
-            <div class="editor-toolbar">
-              <input id="noteTitleInput" class="title-input" aria-label="Note title" />
-              <div class="editor-actions">
-                <button id="saveLocalButton" class="plain-button" type="button">Save draft</button>
-                <button id="saveGithubButton" class="primary-button" type="button">Commit to GitHub</button>
+            <header class="compose-header">
+              <div class="compose-kicker">
+                <span id="composeModeLabel">NEW NOTE</span>
+                <strong>새 노트 작성</strong>
               </div>
+              <div class="compose-actions">
+                <span id="saveStatus">저장 전</span>
+                <button id="cancelEditButton" class="quiet-button" type="button">취소</button>
+                <button id="saveLocalButton" class="quiet-button" type="button">임시저장</button>
+                <button id="saveGithubButton" class="save-button" type="button">저장</button>
+              </div>
+            </header>
+
+            <div class="compose-shell">
+              <section class="compose-main">
+                <input id="noteTitleInput" class="title-input" aria-label="Note title" placeholder="노트 제목" />
+                <div class="note-meta-grid">
+                  <label>
+                    주제
+                    <select id="subjectInput"></select>
+                  </label>
+                  <label>
+                    태그
+                    <input id="tagInput" placeholder="쉼표로 구분 (예: LLM, RAG)" />
+                  </label>
+                </div>
+
+                <div class="write-tabs">
+                  <button id="writeTabButton" class="tab-button active" type="button">작성</button>
+                  <button id="previewTabButton" class="tab-button" type="button">미리보기</button>
+                  <span>Markdown 사용 가능</span>
+                </div>
+
+                <textarea id="markdownInput" spellcheck="false"></textarea>
+                <article class="compose-preview hidden" id="composePreview"></article>
+              </section>
+
+              <aside class="writing-guide" aria-label="Writing guide">
+                <span>WRITING GUIDE</span>
+                <h2>생각을 정리하는 질문</h2>
+                <ol>
+                  <li>
+                    <strong>무엇을 배웠나요?</strong>
+                    <p>핵심 개념을 한 문장으로 적어보세요.</p>
+                  </li>
+                  <li>
+                    <strong>왜 중요한가요?</strong>
+                    <p>언제, 어디에서 쓰이는지 연결해 보세요.</p>
+                  </li>
+                  <li>
+                    <strong>아직 모르는 건?</strong>
+                    <p>다음에 확인할 질문을 남겨두세요.</p>
+                  </li>
+                </ol>
+                <p class="guide-tip">TIP · 완성된 글보다 다시 읽을 수 있는 기록이 더 중요해요.</p>
+              </aside>
             </div>
-            <textarea id="markdownInput" spellcheck="false"></textarea>
           </section>
         </section>
       </main>

@@ -14,8 +14,8 @@
     ]
   },
   {
-    "id": "ml-basics",
-    "title": "ML Basics",
+    "id": "ai-basic",
+    "title": "AI Basic",
     "notes": [
       {
         "title": "Optimization Notes",
@@ -24,18 +24,8 @@
     ]
   },
   {
-    "id": "reading-list",
-    "title": "Reading List",
-    "notes": [
-      {
-        "title": "Next Papers",
-        "path": "notes/next-papers.md"
-      }
-    ]
-  },
-  {
-    "id": "ideas",
-    "title": "Ideas",
+    "id": "mlb-data-study",
+    "title": "MLB Data Study",
     "notes": [
       {
         "title": "Study Questions",

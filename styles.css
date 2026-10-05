@@ -28,7 +28,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -183,7 +184,8 @@ textarea {
 }
 
 .actions,
-.editor-actions {
+.editor-actions,
+.compose-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -191,7 +193,9 @@ textarea {
 
 .segmented,
 .plain-button,
-.primary-button {
+.primary-button,
+.quiet-button,
+.save-button {
   min-height: 38px;
   border-radius: 8px;
   padding: 0 13px;
@@ -222,6 +226,23 @@ textarea {
   background: var(--accent);
   color: #ffffff;
   font-weight: 800;
+}
+
+.quiet-button {
+  border: 0;
+  background: transparent;
+  color: #747b76;
+}
+
+.save-button {
+  min-width: 64px;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: #151816;
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 14px 30px rgba(21, 24, 22, 0.16);
 }
 
 .workspace {
@@ -278,39 +299,244 @@ textarea {
 }
 
 .editor-panel {
-  display: grid;
-  grid-template-rows: auto minmax(420px, calc(100vh - 180px));
+  min-height: calc(100vh - 140px);
+  background: #fbfbf8;
+  border: 1px solid #dcded8;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.compose-header {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 26px;
+  background: #ffffff;
+  border-bottom: 1px solid #dddfd8;
+}
+
+.compose-kicker {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.editor-toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+.compose-kicker span,
+.writing-guide > span {
+  color: #4238ff;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  font-weight: 800;
+}
+
+.compose-kicker strong {
+  font-size: 18px;
+}
+
+.compose-actions > span {
+  color: #777d78;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.compose-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 348px;
+  min-height: calc(100vh - 224px);
 }
 
 .title-input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  height: 42px;
-  border: 1px solid var(--line);
+  height: auto;
+  border: 0;
+  border-bottom: 1px solid #dcded8;
+  border-radius: 0;
+  padding: 48px 4px 42px;
+  background: transparent;
+  color: #151816;
+  font-size: clamp(42px, 6vw, 72px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.title-input::placeholder {
+  color: #b5b8b0;
+}
+
+.compose-main {
+  padding: 0 42px 54px;
+  background: #fbfbf8;
+}
+
+.note-meta-grid {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px 0 26px;
+  border-bottom: 1px solid #dcded8;
+}
+
+.note-meta-grid label {
+  gap: 12px;
+  color: #8a8e88;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.note-meta-grid input,
+.note-meta-grid select {
+  width: 100%;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: #343833;
+  font-size: 16px;
+  outline: none;
+}
+
+.note-meta-grid select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #151816 50%),
+    linear-gradient(135deg, #151816 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 55%,
+    calc(100% - 10px) 55%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 30px;
+}
+
+.write-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+}
+
+.write-tabs span {
+  margin-left: auto;
+  color: #767b75;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.tab-button {
+  min-width: 48px;
+  height: 36px;
+  border: 0;
   border-radius: 8px;
-  padding: 0 12px;
-  background: var(--panel);
-  color: var(--ink);
+  background: transparent;
+  color: #777d78;
+  cursor: pointer;
+}
+
+.tab-button.active {
+  background: #eff0eb;
+  color: #151816;
 }
 
 textarea {
   width: 100%;
-  min-height: 100%;
+  min-height: 430px;
   resize: vertical;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 18px;
-  background: #111b21;
-  color: #edf7f4;
-  line-height: 1.6;
+  border: 0;
+  border-radius: 0;
+  padding: 18px 0;
+  background: transparent;
+  color: #70766f;
+  font-size: 19px;
+  line-height: 1.8;
   tab-size: 2;
+  outline: none;
+}
+
+.compose-preview {
+  min-height: 430px;
+  padding: 12px 0 42px;
+}
+
+.compose-preview h1 {
+  margin: 0 0 22px;
+  font-size: 34px;
+}
+
+.compose-preview h2 {
+  margin: 30px 0 12px;
+  font-size: 22px;
+}
+
+.compose-preview p,
+.compose-preview li {
+  color: #3f4540;
+  line-height: 1.75;
+}
+
+.writing-guide {
+  padding: 54px 30px;
+  background: #f5f5f2;
+  border-left: 1px solid #dcded8;
+}
+
+.writing-guide h2 {
+  margin: 22px 0 36px;
+  color: #101411;
+  font-size: 24px;
+}
+
+.writing-guide ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: guide;
+}
+
+.writing-guide li {
+  position: relative;
+  padding: 18px 0 18px 44px;
+  border-top: 1px solid #dddfd8;
+  counter-increment: guide;
+}
+
+.writing-guide li::before {
+  content: counter(guide, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 21px;
+  color: #4238ff;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.writing-guide li strong {
+  display: block;
+  color: #141815;
+  font-size: 15px;
+}
+
+.writing-guide li p {
+  margin: 8px 0 0;
+  color: #69706a;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.guide-tip {
+  margin-top: 58px;
+  padding: 20px 18px;
+  border-radius: 8px;
+  background: #eeebff;
+  color: #656271;
+  font-size: 12px;
+  line-height: 1.65;
 }
 
 .hidden {
@@ -412,6 +638,44 @@ menu {
   .editor-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .compose-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px;
+  }
+
+  .compose-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .compose-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .compose-main {
+    padding: 0 18px 34px;
+  }
+
+  .title-input {
+    padding: 32px 0 28px;
+    font-size: 44px;
+  }
+
+  .note-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .write-tabs span {
+    display: none;
+  }
+
+  .writing-guide {
+    border-left: 0;
+    border-top: 1px solid #dcded8;
+    padding: 34px 22px;
   }
 }
 
