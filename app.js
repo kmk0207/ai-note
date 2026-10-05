@@ -4,6 +4,7 @@ const state = {
   markdown: "",
   mode: "preview",
   composeMode: "write",
+  view: "home",
 };
 
 const elements = {
@@ -11,6 +12,7 @@ const elements = {
   noteNav: document.querySelector("#noteNav"),
   currentSection: document.querySelector("#currentSection"),
   currentTitle: document.querySelector("#currentTitle"),
+  postActions: document.querySelector("#postActions"),
   previewPanel: document.querySelector("#previewPanel"),
   editorPanel: document.querySelector("#editorPanel"),
   markdownInput: document.querySelector("#markdownInput"),
@@ -36,6 +38,7 @@ const elements = {
   saveLocalButton: document.querySelector("#saveLocalButton"),
   saveGithubButton: document.querySelector("#saveGithubButton"),
   newNoteButton: document.querySelector("#newNoteButton"),
+  homeButton: document.querySelector("#homeButton"),
   sidebarOpen: document.querySelector("#sidebarOpen"),
   sidebarClose: document.querySelector("#sidebarClose"),
 };
@@ -51,10 +54,7 @@ async function boot() {
   await loadManifest();
   renderNav();
   bindEvents();
-  const firstNote = state.manifest.flatMap((section) => section.notes)[0];
-  if (firstNote) {
-    await openNote(firstNote.path);
-  }
+  await showHome();
 }
 
 async function loadManifest() {
@@ -72,6 +72,7 @@ function bindEvents() {
     commitCurrentNote().catch((error) => toast(error.message));
   });
   elements.newNoteButton.addEventListener("click", createNewNote);
+  elements.homeButton.addEventListener("click", showHome);
   elements.cancelEditButton.addEventListener("click", () => setMode("preview"));
   elements.writeTabButton.addEventListener("click", () => setComposeMode("write"));
   elements.previewTabButton.addEventListener("click", () => setComposeMode("preview"));
@@ -93,10 +94,13 @@ function setSidebar(value) {
 }
 
 function setMode(mode) {
+  if (!state.current && mode !== "preview") return;
   state.mode = mode;
+  state.view = "post";
   const isPreview = mode === "preview";
   elements.previewPanel.classList.toggle("hidden", !isPreview);
   elements.editorPanel.classList.toggle("hidden", isPreview);
+  elements.postActions.classList.remove("hidden");
   elements.viewButton.classList.toggle("active", isPreview);
   elements.editButton.classList.toggle("active", !isPreview);
   if (isPreview) {
@@ -104,6 +108,28 @@ function setMode(mode) {
   } else {
     elements.composeModeLabel.textContent = state.current?.isNew ? "NEW NOTE" : "EDIT NOTE";
     setComposeMode("write");
+  }
+}
+
+async function showHome() {
+  state.view = "home";
+  state.current = null;
+  state.markdown = "";
+  state.mode = "preview";
+  elements.currentSection.textContent = "Home";
+  elements.currentTitle.textContent = "All Posts";
+  elements.previewPanel.classList.remove("hidden");
+  elements.editorPanel.classList.add("hidden");
+  elements.postActions.classList.add("hidden");
+  document.querySelectorAll(".note-link").forEach((button) => {
+    button.classList.remove("active");
+  });
+  elements.previewPanel.innerHTML = await renderHome();
+  elements.previewPanel.querySelectorAll("[data-open-note]").forEach((card) => {
+    card.addEventListener("click", () => openNote(card.dataset.openNote));
+  });
+  if (window.matchMedia("(max-width: 820px)").matches) {
+    setSidebar("closed");
   }
 }
 
@@ -172,6 +198,8 @@ async function openNote(path) {
   }
 
   state.current = note;
+  state.view = "post";
+  elements.postActions.classList.remove("hidden");
   elements.currentSection.textContent = note.sectionTitle;
   elements.currentTitle.textContent = note.title;
   elements.noteTitleInput.value = note.title;
@@ -340,9 +368,7 @@ async function deleteCurrentNote() {
   } else {
     state.current = null;
     state.markdown = "";
-    elements.currentSection.textContent = "";
-    elements.currentTitle.textContent = "No notes";
-    elements.previewPanel.innerHTML = "<p>아직 글이 없습니다. 새 노트를 작성해보세요.</p>";
+    await showHome();
   }
 }
 
@@ -499,6 +525,88 @@ function toBase64(value) {
 
 function renderPreview() {
   elements.previewPanel.innerHTML = renderBlogPost();
+}
+
+async function renderHome() {
+  const notes = getAllNotes();
+  const cards = await Promise.all(
+    notes.map(async (note) => {
+      const markdown = await loadNoteMarkdown(note.path);
+      const excerpt = createExcerpt(markdown, note.title);
+      const tags = parseTags(note.tags)
+        .slice(0, 4)
+        .map((tag) => `<span>${escapeHtml(tag)}</span>`)
+        .join("");
+      return `
+        <button class="post-card" type="button" data-open-note="${escapeHtml(note.path)}">
+          <div class="post-card-section">${escapeHtml(note.sectionTitle)}</div>
+          <h2>${escapeHtml(note.title)}</h2>
+          <p>${escapeHtml(excerpt)}</p>
+          ${tags ? `<div class="post-card-tags">${tags}</div>` : ""}
+        </button>
+      `;
+    }),
+  );
+
+  return `
+    <section class="home-view">
+      <header class="home-hero">
+        <span>AI NOTE</span>
+        <h1>All Posts</h1>
+        <p>논문 리뷰, AI 기초, 데이터 공부를 한 곳에 모아두는 개인 공부 블로그.</p>
+      </header>
+      <div class="post-grid">
+        ${cards.join("") || `<p class="empty-posts">아직 작성된 글이 없습니다.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function getAllNotes() {
+  return state.manifest.flatMap((section) =>
+    section.notes.map((note) => ({
+      ...note,
+      section: section.id,
+      sectionTitle: section.title,
+    })),
+  );
+}
+
+async function loadNoteMarkdown(path) {
+  const draft = localStorage.getItem(storageKeys.draft(path));
+  if (draft) return draft;
+  try {
+    const response = await fetch(`./${path}`);
+    if (!response.ok) return "";
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
+function createExcerpt(markdown, title = "") {
+  const text = stripMarkdown(removeLeadingTitle(markdown, title))
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 130 ? `${text.slice(0, 130)}...` : text || "아직 본문이 없습니다.";
+}
+
+function stripMarkdown(markdown) {
+  return markdown
+    .replace(/^!\[[^\]]*]\([^)]+\)$/gm, "")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/^-\s+/gm, "")
+    .replace(/[`*_]/g, "");
+}
+
+function removeLeadingTitle(markdown, title) {
+  const lines = markdown.split(/\r?\n/);
+  if (title && lines[0]?.trim() === `# ${title}`) {
+    return lines.slice(1).join("\n");
+  }
+  return markdown;
 }
 
 function renderBlogPost() {
