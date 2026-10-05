@@ -348,16 +348,16 @@ async function deleteCurrentNote() {
   if (!ok) return;
 
   const deletedPath = state.current.path;
-  const settings = getSettings();
+  const previousManifest = structuredClone(state.manifest);
   removeNoteFromManifest(deletedPath);
   localStorage.removeItem(storageKeys.draft(deletedPath));
 
-  if (settings.owner && settings.repo && settings.branch && settings.token) {
-    await deleteNoteFromGithub(deletedPath, settings);
-    await commitManifest(settings);
-    toast("GitHub에서 글을 삭제했어요.");
-  } else {
-    toast("현재 브라우저 목록에서 삭제했어요.");
+  try {
+    await persistLocalDelete(deletedPath);
+  } catch (error) {
+    state.manifest = previousManifest;
+    renderNav();
+    throw error;
   }
 
   renderNav();
@@ -372,30 +372,33 @@ async function deleteCurrentNote() {
   }
 }
 
-async function deleteNoteFromGithub(path, settings) {
-  if (path.includes("/draft-")) return;
-  const apiBase = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
-  const existing = await fetch(`${apiBase}?ref=${settings.branch}`, {
-    headers: githubHeaders(settings.token),
-  });
-  if (existing.status === 404) return;
-  if (!existing.ok) {
-    throw new Error(`GitHub could not read the file: ${existing.status}`);
+async function persistLocalDelete(path) {
+  if (!("showDirectoryPicker" in window)) {
+    throw new Error(
+      "이 브라우저는 로컬 파일 삭제를 지원하지 않아요. Chrome에서 열고 다시 시도해 주세요.",
+    );
   }
-  const data = await existing.json();
-  const deleted = await fetch(apiBase, {
-    method: "DELETE",
-    headers: githubHeaders(settings.token),
-    body: JSON.stringify({
-      message: `Delete ${state.current.title}`,
-      sha: data.sha,
-      branch: settings.branch,
-    }),
+
+  const root = await window.showDirectoryPicker({
+    id: "ai-note-root",
+    mode: "readwrite",
   });
-  if (!deleted.ok) {
-    const detail = await deleted.text();
-    throw new Error(`GitHub delete failed: ${detail}`);
+  const notesDirectory = await root.getDirectoryHandle("notes");
+  const manifestHandle = await notesDirectory.getFileHandle("manifest.json");
+
+  if (!path.includes("/draft-")) {
+    const filename = path.replace(/^notes\//, "");
+    await notesDirectory.removeEntry(filename).catch((error) => {
+      if (error.name !== "NotFoundError") {
+        throw error;
+      }
+    });
   }
+
+  const manifestWritable = await manifestHandle.createWritable();
+  await manifestWritable.write(`${JSON.stringify(state.manifest, null, 2)}\n`);
+  await manifestWritable.close();
+  toast("로컬 파일에서 삭제했어요. 이제 git add/commit/push 하면 공개 사이트에 반영돼요.");
 }
 
 function prepareCurrentNoteForSave() {
