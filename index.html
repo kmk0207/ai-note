@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Note</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" data-sidebar="open">
+      <aside class="sidebar" aria-label="Study navigation">
+        <div class="brand-row">
+          <button class="icon-button" id="sidebarClose" type="button" aria-label="Close sidebar" title="Close sidebar">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div>
+            <strong>AI Note</strong>
+            <span>paper study</span>
+          </div>
+        </div>
+
+        <button class="new-note-button" id="newNoteButton" type="button">+ New note</button>
+        <nav class="note-nav" id="noteNav" aria-label="Notes"></nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="icon-button" id="sidebarOpen" type="button" aria-label="Open sidebar" title="Open sidebar">
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="topbar-title">
+            <span id="currentSection">Paper Review</span>
+            <strong id="currentTitle">Loading...</strong>
+          </div>
+          <div class="actions">
+            <button id="viewButton" class="segmented active" type="button">Preview</button>
+            <button id="editButton" class="segmented" type="button">Edit</button>
+            <button id="settingsButton" class="plain-button" type="button">Settings</button>
+          </div>
+        </header>
+
+        <section class="workspace">
+          <article class="preview-panel" id="previewPanel"></article>
+          <section class="editor-panel hidden" id="editorPanel" aria-label="Markdown editor">
+            <div class="editor-toolbar">
+              <input id="noteTitleInput" class="title-input" aria-label="Note title" />
+              <div class="editor-actions">
+                <button id="saveLocalButton" class="plain-button" type="button">Save draft</button>
+                <button id="saveGithubButton" class="primary-button" type="button">Commit to GitHub</button>
+              </div>
+            </div>
+            <textarea id="markdownInput" spellcheck="false"></textarea>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="settingsDialog">
+      <form method="dialog" class="dialog-card">
+        <div class="dialog-heading">
+          <div>
+            <strong>GitHub settings</strong>
+            <span>Used only in this browser when committing edits.</span>
+          </div>
+          <button class="icon-button" value="close" aria-label="Close settings" title="Close settings">×</button>
+        </div>
+
+        <label>
+          Owner
+          <input id="ownerInput" placeholder="your-github-id" />
+        </label>
+        <label>
+          Repository
+          <input id="repoInput" placeholder="ai-note" />
+        </label>
+        <label>
+          Branch
+          <input id="branchInput" placeholder="main" />
+        </label>
+        <label>
+          Fine-grained token
+          <input id="tokenInput" type="password" placeholder="contents: read/write" />
+        </label>
+        <p class="muted">
+          The token is kept in this browser only. For safer use, create a fine-grained GitHub token limited to this repository's Contents permission.
+        </p>
+        <menu>
+          <button id="saveSettingsButton" class="primary-button" value="default" type="button">Save settings</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

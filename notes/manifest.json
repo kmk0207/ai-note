@@ -1,0 +1,46 @@
+[
+  {
+    "id": "paper-review",
+    "title": "Paper Review",
+    "notes": [
+      {
+        "title": "Attention Is All You Need",
+        "path": "notes/attention-is-all-you-need.md"
+      },
+      {
+        "title": "Long Short-Term Memory",
+        "path": "notes/long-short-term-memory.md"
+      }
+    ]
+  },
+  {
+    "id": "ml-basics",
+    "title": "ML Basics",
+    "notes": [
+      {
+        "title": "Optimization Notes",
+        "path": "notes/optimization-notes.md"
+      }
+    ]
+  },
+  {
+    "id": "reading-list",
+    "title": "Reading List",
+    "notes": [
+      {
+        "title": "Next Papers",
+        "path": "notes/next-papers.md"
+      }
+    ]
+  },
+  {
+    "id": "ideas",
+    "title": "Ideas",
+    "notes": [
+      {
+        "title": "Study Questions",
+        "path": "notes/study-questions.md"
+      }
+    ]
+  }
+]
