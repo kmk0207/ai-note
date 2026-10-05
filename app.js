@@ -22,21 +22,22 @@ const elements = {
   cancelEditButton: document.querySelector("#cancelEditButton"),
   writeTabButton: document.querySelector("#writeTabButton"),
   previewTabButton: document.querySelector("#previewTabButton"),
+  imageButton: document.querySelector("#imageButton"),
+  linkButton: document.querySelector("#linkButton"),
+  linkPanel: document.querySelector("#linkPanel"),
+  linkTextInput: document.querySelector("#linkTextInput"),
+  linkUrlInput: document.querySelector("#linkUrlInput"),
+  insertLinkButton: document.querySelector("#insertLinkButton"),
+  imageInput: document.querySelector("#imageInput"),
   composePreview: document.querySelector("#composePreview"),
   viewButton: document.querySelector("#viewButton"),
   editButton: document.querySelector("#editButton"),
+  deleteNoteButton: document.querySelector("#deleteNoteButton"),
   saveLocalButton: document.querySelector("#saveLocalButton"),
   saveGithubButton: document.querySelector("#saveGithubButton"),
   newNoteButton: document.querySelector("#newNoteButton"),
   sidebarOpen: document.querySelector("#sidebarOpen"),
   sidebarClose: document.querySelector("#sidebarClose"),
-  settingsButton: document.querySelector("#settingsButton"),
-  settingsDialog: document.querySelector("#settingsDialog"),
-  saveSettingsButton: document.querySelector("#saveSettingsButton"),
-  ownerInput: document.querySelector("#ownerInput"),
-  repoInput: document.querySelector("#repoInput"),
-  branchInput: document.querySelector("#branchInput"),
-  tokenInput: document.querySelector("#tokenInput"),
 };
 
 const storageKeys = {
@@ -47,7 +48,6 @@ const storageKeys = {
 boot();
 
 async function boot() {
-  loadSettings();
   await loadManifest();
   renderNav();
   bindEvents();
@@ -75,8 +75,13 @@ function bindEvents() {
   elements.cancelEditButton.addEventListener("click", () => setMode("preview"));
   elements.writeTabButton.addEventListener("click", () => setComposeMode("write"));
   elements.previewTabButton.addEventListener("click", () => setComposeMode("preview"));
-  elements.settingsButton.addEventListener("click", () => elements.settingsDialog.showModal());
-  elements.saveSettingsButton.addEventListener("click", saveSettings);
+  elements.imageButton.addEventListener("click", () => elements.imageInput.click());
+  elements.linkButton.addEventListener("click", toggleLinkPanel);
+  elements.insertLinkButton.addEventListener("click", insertLink);
+  elements.imageInput.addEventListener("change", insertSelectedImage);
+  elements.deleteNoteButton.addEventListener("click", () => {
+    deleteCurrentNote().catch((error) => toast(error.message));
+  });
   elements.markdownInput.addEventListener("input", updateMarkdownFromEditor);
   elements.noteTitleInput.addEventListener("input", updateTitleFromEditor);
   elements.subjectInput.addEventListener("change", updateSubjectFromEditor);
@@ -110,7 +115,7 @@ function setComposeMode(mode) {
   elements.writeTabButton.classList.toggle("active", isWrite);
   elements.previewTabButton.classList.toggle("active", !isWrite);
   if (!isWrite) {
-    elements.composePreview.innerHTML = markdownToHtml(state.markdown);
+    elements.composePreview.innerHTML = markdownBodyToHtml(state.markdown);
   }
 }
 
@@ -243,7 +248,7 @@ function createNewNote() {
     isNew: true,
   };
   state.current = note;
-  state.markdown = `# 오늘 공부한 내용\n\n핵심 개념을 내 언어로 정리해 보세요.\n\n## 무엇을 배웠나요?\n\n\n## 왜 중요한가요?\n\n\n## 아직 모르는 건?\n\n`;
+  state.markdown = "";
   syncCurrentNoteIntoManifest();
   renderNav();
   elements.currentSection.textContent = note.sectionTitle;
@@ -261,15 +266,15 @@ function createNewNote() {
 
 async function commitCurrentNote() {
   if (!state.current) return;
+  prepareCurrentNoteForSave();
 
   const settings = getSettings();
   if (!settings.owner || !settings.repo || !settings.branch || !settings.token) {
-    elements.settingsDialog.showModal();
-    toast("Add GitHub settings first.");
+    saveLocalDraft();
+    toast("GitHub 토큰이 없어 브라우저에 저장했어요.");
     return;
   }
 
-  prepareCurrentNoteForSave();
   const path = state.current.path;
   const apiBase = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
   let sha;
@@ -307,6 +312,64 @@ async function commitCurrentNote() {
   state.current.isNew = false;
   elements.saveStatus.textContent = "저장됨";
   toast("GitHub에 저장했어요.");
+}
+
+async function deleteCurrentNote() {
+  if (!state.current) return;
+  const ok = confirm(`'${state.current.title}' 글을 삭제할까요?`);
+  if (!ok) return;
+
+  const deletedPath = state.current.path;
+  const settings = getSettings();
+  removeNoteFromManifest(deletedPath);
+  localStorage.removeItem(storageKeys.draft(deletedPath));
+
+  if (settings.owner && settings.repo && settings.branch && settings.token) {
+    await deleteNoteFromGithub(deletedPath, settings);
+    await commitManifest(settings);
+    toast("GitHub에서 글을 삭제했어요.");
+  } else {
+    toast("현재 브라우저 목록에서 삭제했어요.");
+  }
+
+  renderNav();
+  const nextNote = state.manifest.flatMap((section) => section.notes)[0];
+  if (nextNote) {
+    await openNote(nextNote.path);
+    setMode("preview");
+  } else {
+    state.current = null;
+    state.markdown = "";
+    elements.currentSection.textContent = "";
+    elements.currentTitle.textContent = "No notes";
+    elements.previewPanel.innerHTML = "<p>아직 글이 없습니다. 새 노트를 작성해보세요.</p>";
+  }
+}
+
+async function deleteNoteFromGithub(path, settings) {
+  if (path.includes("/draft-")) return;
+  const apiBase = `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${path}`;
+  const existing = await fetch(`${apiBase}?ref=${settings.branch}`, {
+    headers: githubHeaders(settings.token),
+  });
+  if (existing.status === 404) return;
+  if (!existing.ok) {
+    throw new Error(`GitHub could not read the file: ${existing.status}`);
+  }
+  const data = await existing.json();
+  const deleted = await fetch(apiBase, {
+    method: "DELETE",
+    headers: githubHeaders(settings.token),
+    body: JSON.stringify({
+      message: `Delete ${state.current.title}`,
+      sha: data.sha,
+      branch: settings.branch,
+    }),
+  });
+  if (!deleted.ok) {
+    const detail = await deleted.text();
+    throw new Error(`GitHub delete failed: ${detail}`);
+  }
 }
 
 function prepareCurrentNoteForSave() {
@@ -435,7 +498,31 @@ function toBase64(value) {
 }
 
 function renderPreview() {
-  elements.previewPanel.innerHTML = markdownToHtml(state.markdown);
+  elements.previewPanel.innerHTML = renderBlogPost();
+}
+
+function renderBlogPost() {
+  if (!state.current) return "";
+  const tags = parseTags(state.current.tags)
+    .map((tag) => `<span class="post-tag">${escapeHtml(tag)}</span>`)
+    .join("");
+  return `
+    <header class="post-header">
+      <h1>${escapeHtml(state.current.title)}</h1>
+      <div class="post-meta">
+        <span>AI Note</span>
+        <span>${escapeHtml(state.current.sectionTitle)}</span>
+      </div>
+      ${tags ? `<div class="post-tags">${tags}</div>` : ""}
+    </header>
+    <div class="post-body">
+      ${markdownBodyToHtml(state.markdown)}
+    </div>
+  `;
+}
+
+function markdownBodyToHtml(markdown) {
+  return markdownToHtml(stripLeadingTitle(markdown));
 }
 
 function markdownToHtml(markdown) {
@@ -459,6 +546,15 @@ function markdownToHtml(markdown) {
     const line = rawLine.trimEnd();
     if (!line.trim()) {
       closeBlocks();
+      continue;
+    }
+
+    const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imageMatch) {
+      closeBlocks();
+      html.push(
+        `<figure><img src="${sanitizeUrl(imageMatch[2])}" alt="${escapeHtml(imageMatch[1])}" /></figure>`,
+      );
       continue;
     }
 
@@ -501,7 +597,10 @@ function markdownToHtml(markdown) {
 function inlineMarkdown(value) {
   return escapeHtml(value)
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>");
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, url) => {
+      return `<a href="${sanitizeUrl(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    });
 }
 
 function escapeHtml(value) {
@@ -513,33 +612,13 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-function loadSettings() {
-  const settings = getSettings();
-  elements.ownerInput.value = settings.owner;
-  elements.repoInput.value = settings.repo;
-  elements.branchInput.value = settings.branch;
-  elements.tokenInput.value = settings.token;
-}
-
 function getSettings() {
-  const fallback = { owner: "", repo: "ai-note", branch: "main", token: "" };
+  const fallback = { owner: "kmk0207", repo: "ai-note", branch: "main", token: "" };
   try {
     return { ...fallback, ...JSON.parse(localStorage.getItem(storageKeys.settings)) };
   } catch {
     return fallback;
   }
-}
-
-function saveSettings() {
-  const settings = {
-    owner: elements.ownerInput.value.trim(),
-    repo: elements.repoInput.value.trim() || "ai-note",
-    branch: elements.branchInput.value.trim() || "main",
-    token: elements.tokenInput.value.trim(),
-  };
-  localStorage.setItem(storageKeys.settings, JSON.stringify(settings));
-  elements.settingsDialog.close();
-  toast("Settings saved.");
 }
 
 function toast(message) {
@@ -558,4 +637,72 @@ function toast(message) {
   `;
   document.body.append(item);
   window.setTimeout(() => item.remove(), 2600);
+}
+
+function insertLink() {
+  const url = elements.linkUrlInput.value.trim();
+  if (!url) return;
+  const label = elements.linkTextInput.value.trim() || url;
+  insertAtCursor(`[${label}](${url})`);
+  elements.linkTextInput.value = "";
+  elements.linkUrlInput.value = "";
+  elements.linkPanel.classList.add("hidden");
+}
+
+function toggleLinkPanel() {
+  elements.linkPanel.classList.toggle("hidden");
+  if (!elements.linkPanel.classList.contains("hidden")) {
+    elements.linkTextInput.focus();
+  }
+}
+
+function insertSelectedImage() {
+  const file = elements.imageInput.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    insertAtCursor(`![${file.name}](${reader.result})`);
+    elements.imageInput.value = "";
+  });
+  reader.readAsDataURL(file);
+}
+
+function insertAtCursor(snippet) {
+  const textarea = elements.markdownInput;
+  const start = textarea.selectionStart ?? textarea.value.length;
+  const end = textarea.selectionEnd ?? textarea.value.length;
+  const prefix = textarea.value.slice(0, start);
+  const suffix = textarea.value.slice(end);
+  const spacingBefore = prefix && !prefix.endsWith("\n") ? "\n\n" : "";
+  const spacingAfter = suffix && !suffix.startsWith("\n") ? "\n\n" : "";
+  textarea.value = `${prefix}${spacingBefore}${snippet}${spacingAfter}${suffix}`;
+  state.markdown = textarea.value;
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = start + spacingBefore.length + snippet.length;
+  elements.saveStatus.textContent = "저장 전";
+}
+
+function stripLeadingTitle(markdown) {
+  const title = state.current?.title?.trim();
+  if (!title) return markdown;
+  const lines = markdown.split(/\r?\n/);
+  if (lines[0]?.trim() === `# ${title}`) {
+    return lines.slice(1).join("\n").trimStart();
+  }
+  return markdown;
+}
+
+function parseTags(tags) {
+  return String(tags || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function sanitizeUrl(url) {
+  const value = String(url || "").trim();
+  if (/^(https?:|data:image\/|\.\/|\/|#)/i.test(value)) {
+    return escapeHtml(value);
+  }
+  return "#";
 }
