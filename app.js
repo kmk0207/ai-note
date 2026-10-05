@@ -847,7 +847,7 @@ async function insertSelectedImage() {
     const dataUrl = await readFileAsDataUrl(file);
     const uploadedPath = await uploadImageThroughLocalServer(file, dataUrl);
     if (uploadedPath) {
-      insertAtCursor(`![${file.name}](../${uploadedPath})`);
+      insertAtCursor(`![${file.name}](./${uploadedPath})`);
       toast("이미지를 로컬 images 폴더에 저장했어요.");
       return;
     }
