@@ -8,12 +8,12 @@ Personal paper-study notes as a public GitHub Pages site.
 - Markdown paper notes
 - Preview and edit modes
 - Local browser drafts
-- Optional GitHub commit from the web UI through the GitHub Contents API
+- Local note deletion through the local editor server
 - No build step
 
 ## Local preview
 
-Run a small static server from this folder:
+For normal viewing, run a small static server from this folder:
 
 ```bash
 python -m http.server 5173
@@ -23,6 +23,27 @@ Then open:
 
 ```text
 http://localhost:5173
+```
+
+For local editing features that must change files, such as deleting a note from
+`notes/` and updating `notes/manifest.json`, use the local editor server instead:
+
+```bash
+node local-server.mjs
+```
+
+Then open:
+
+```text
+http://localhost:5173
+```
+
+After deleting a note, publish the change with:
+
+```bash
+git add .
+git commit -m "Delete note"
+git push
 ```
 
 ## GitHub setup
@@ -37,12 +58,4 @@ http://localhost:5173
 
 The site can save drafts in the browser without a GitHub login.
 
-To commit edits back to GitHub from the site:
-
-1. Create a fine-grained GitHub token for this repository.
-2. Give it Contents read/write permission.
-3. Open Settings in the site.
-4. Enter owner, repository, branch, and token.
-5. Edit a note and use Commit to GitHub.
-
-For public visitors, keep editing disabled by not giving them a token.
+For public publishing, make sure file changes are committed and pushed to GitHub.

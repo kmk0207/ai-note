@@ -373,9 +373,15 @@ async function deleteCurrentNote() {
 }
 
 async function persistLocalDelete(path) {
+  const apiDeleted = await persistDeleteThroughLocalServer(path);
+  if (apiDeleted) {
+    toast("로컬 파일에서 삭제했어요. 이제 git add/commit/push 하면 공개 사이트에 반영돼요.");
+    return;
+  }
+
   if (!("showDirectoryPicker" in window)) {
     throw new Error(
-      "이 브라우저는 로컬 파일 삭제를 지원하지 않아요. Chrome에서 열고 다시 시도해 주세요.",
+      "현재 실행 방식에서는 파일 삭제를 직접 반영할 수 없어요. `node local-server.mjs`로 사이트를 다시 열고 삭제해 주세요.",
     );
   }
 
@@ -399,6 +405,34 @@ async function persistLocalDelete(path) {
   await manifestWritable.write(`${JSON.stringify(state.manifest, null, 2)}\n`);
   await manifestWritable.close();
   toast("로컬 파일에서 삭제했어요. 이제 git add/commit/push 하면 공개 사이트에 반영돼요.");
+}
+
+async function persistDeleteThroughLocalServer(path) {
+  try {
+    const response = await fetch("./api/delete-note", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        path,
+        manifest: state.manifest,
+      }),
+    });
+    if (response.status === 404 || response.status === 405) {
+      return false;
+    }
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "로컬 서버에서 삭제하지 못했어요.");
+    }
+    return true;
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 function prepareCurrentNoteForSave() {
